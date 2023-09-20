@@ -2,7 +2,6 @@ import time
 import pandas as pd
 import itertools as it
 
-
 # fonction pour calcule le temps d'execution
 def timeit(method):
     def timed(*args, **kw):
@@ -16,108 +15,146 @@ def timeit(method):
     return timed
 
 
-def read_data(filename):
-    data = pd.read_csv(filename)
-    return data
-
-
-def clean_data(data):
+# Function to read and rename columns
+def read_data(filepath):
+    data = pd.read_csv(filepath)
     data = data.rename(
         columns={
             "Actions #": "name",
-            "Coût par action (en euros)": "cost",
+            "Coût par action (en euros)": "price",
             "Bénéfice (après 2 ans)": "profit",
         }
     )
-    data["profit"] = data["profit"].apply(lambda x: float(x.strip("%")) / 100)
+    return data
+
+
+# Function to format profit
+def format_profit(x):
+    if isinstance(x, str):
+        return x.replace("%", "")
+    return x
+
+
+# Function to clean the dataset
+def clean_dataset(data):
+    # Clean the 'profit' column
+    data["profit"] = data["profit"].apply(format_profit)
+    data["profit"] = data["profit"].apply(lambda x: float(x) / 100)
+
+    # Clean the 'price' column
+    data["price"] = data["price"].apply(lambda x: float(x))
+
+    # Filter rows with positive prices
+    data = data[data["price"] > 0]
+
     return data
 
 
 @timeit
-def read_and_format_data(filename):
-    data = read_data(filename)
-    data = clean_data(data)
+def load_and_clean_dataset(filepath):
+    data = read_data(filepath)
+    data = clean_dataset(data)
     return data
 
 
 # Faire une petite classe pour stocker les données d'une action
 class Action:
-    def __init__(self, name, cost, profit):
+    def __init__(self, name, price, profit):
         self.name = name
-        self.cost = cost
+        self.price = price
         self.profit = profit
 
     def __repr__(self):
-        return f"{self.name} (Coût : {self.cost} euros, Bénéfice : {self.profit * 100:.0f}%)"
+        return (
+            f"{self.name} (Price : {self.price} €, Return : {self.profit * 100:.0f}%)"
+        )
 
 
 def convert_dataframe_to_action_list(data):
     actions = []
     for action in data.itertuples():
-        actions.append(Action(action.name, action.cost, action.profit))
+        actions.append(Action(action.name, action.price, action.profit))
     return actions
 
 
 # Fonction pour générer toutes les combinaisons possibles d'actions
 @timeit
 def generer_combinaisons(actions, budget_max):
-    meilleures_combinaisons = []
-    nombre_total_combinaisons = 0
-    meilleur_profit = 0
+    best_combinations = []
+    total_combinations = 0
+    best_gain = 0  # gain = price * profit
 
     # Boucle pour générer toutes les combinaisons
     for r in range(1, len(actions) + 1):
-        for combinaison in it.combinations(actions, r):
-            coût_total = sum(action.cost for action in combinaison)
-            nombre_total_combinaisons += 1
+        for combination in it.combinations(actions, r):
+            total_cost_combination = sum(
+                action.price for action in combination
+            )  # cout total de la combinaison
+            total_combinations += 1
 
             # Vérifie si la combinaison respecte les contraintes de budget
-            if coût_total <= budget_max:
-                profit_combinaison = sum(
-                    action.profit * action.cost for action in combinaison
+            if (
+                total_cost_combination <= budget_max
+            ):  # combinaison_gains = sum(action.profit * action.price for action in combinaison)
+                all_combinations_gain = sum(
+                    action.profit * action.price for action in combination
                 )
-                if profit_combinaison > meilleur_profit:
-                    meilleures_combinaisons = [combinaison]
-                    meilleur_profit = profit_combinaison
-                elif profit_combinaison == meilleur_profit:
-                    meilleures_combinaisons.append(combinaison)
+                if all_combinations_gain > best_gain:
+                    best_combinations = [combination]
+                    best_gain = all_combinations_gain
+                elif all_combinations_gain == best_gain:
+                    best_combinations.append(combination)
 
-    return meilleures_combinaisons, nombre_total_combinaisons, meilleur_profit
+    return best_combinations, total_combinations, best_gain
 
 
 # Fonction pour affichage de la meilleure combinaison
-
-
-def afficher_meilleure_combinaison(meilleures_combinaisons, meilleur_profit):
-    if len(meilleures_combinaisons) > 0:
+def afficher_meilleure_combinaison(best_combinations, total_combinations, best_gain):
+    if len(best_combinations) > 0:
         print("Meilleure combinaison d'actions :")
-        for action in meilleures_combinaisons[0]:
+        for action in best_combinations[0]:
             print("*", action)
-        print(f"\nProfit total  : {meilleur_profit:.1f} euros")
+        print(f"\nGain total de l'investissement  : {best_gain:.1f} euros")
         # Nombre total d'actions dans la combinaison
         print(
-            f"\tNombre total d'actions dans la combinaison : {len(meilleures_combinaisons[0])}"
+            f"\tNombre total d'actions dans la combinaison : {len(best_combinations[0])}"
         )
+
         # Coût total de la combinaison
+        total_cost_combination = sum(action.price for action in best_combinations[0])
         print(
-            f"\tCoût total de la combinaison : {sum(action.cost for action in meilleures_combinaisons[0])} euros"
+            f"\tCoût total investit dans la combinaison : {total_cost_combination} euros"
         )
-        print("\nNombre total de combinaisons générées :", nombre_total_combinaisons)
+
+        # Rentabilité de la combinaison (Profitabilité)
+        profitability = (best_gain / total_cost_combination) * 100
+        print(f"\tRentabilité de la combinaison : {profitability:.1f}%")
+
+        print("\nNombre total de combinaisons générées :", total_combinations)
     else:
         print("Aucune combinaison possible respectant les contraintes de budget.")
 
 
-# Lancer le programme
-
-if __name__ == "__main__":
-    filename = "dataset.csv"
+def main():
+    # Chemin du fichier CSV et budget maximal
+    filepath = "./data/dataset.csv"
     budget_max = 500
 
-    data = read_and_format_data(filename)
+    # Chargement et nettoyage des données
+    data = load_and_clean_dataset(filepath)
+
+    # Conversion des données en liste d'actions
     actions = convert_dataframe_to_action_list(data)
-    (
-        meilleures_combinaisons,
-        nombre_total_combinaisons,
-        meilleur_profit,
-    ) = generer_combinaisons(actions, budget_max)
-    afficher_meilleure_combinaison(meilleures_combinaisons, meilleur_profit)
+
+    # Génération des combinaisons optimales
+    (best_combinations, total_combinations, best_gain) = generer_combinaisons(
+        actions, budget_max
+    )
+
+    # Affichage de la meilleure combinaison et de ses statistiques
+    afficher_meilleure_combinaison(best_combinations, total_combinations, best_gain)
+
+
+# Lancer le programme
+if __name__ == "__main__":
+    main()

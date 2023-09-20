@@ -114,11 +114,26 @@ def display_selected_actions(selected_actions, total_profit):
 
 
 # Programme principal
-if __name__ == "__main__":
-    filename = "./data/dataset1.csv"
-    budget_max = 500
 
+def main():
+    filename = "./data/dataset1.csv"  # Le chemin vers le fichier de données
+    budget_max = 500  # Le budget maximum disponible
+
+    # Charger et nettoyer le jeu de données à partir du fichier CSV
     data = load_and_clean_dataset(filename)
+
+    # Convertir le DataFrame en une liste d'objets Action
     actions = convert_dataframe_to_action_list(data)
+
+    # Résoudre le problème de sélection d'actions en utilisant  l'approche gloutonne
     selected_actions, total_profit = solve_greedy(actions, budget_max)
+
+    # Affichage des actions sélectionnées et le profit total
     display_selected_actions(selected_actions, total_profit)
+
+
+# Appel de la fonction principale
+if __name__ == "__main__":
+    main()
+
+

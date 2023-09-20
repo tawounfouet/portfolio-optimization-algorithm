@@ -2,6 +2,7 @@ import time
 import pandas as pd
 import itertools as it
 
+
 # fonction pour calcule le temps d'execution
 def timeit(method):
     def timed(*args, **kw):
